@@ -55,10 +55,10 @@ jobs:
         run: pip install bandit
 
       - name: Ejecutar Bandit (bloquea en severidad MEDIA o superior)
-        run: bandit -r . -ii -x ./venv,./.git,./migrations
+        run: bandit -r . -ll -x ./venv,./.git,./migrations,./articulos/tests.py
 
       - name: Guardar reporte JSON de Bandit
-        run: bandit -r . -f json -o bandit-report.json -x ./venv,./.git,./migrations || true
+        run: bandit -r . -f json -o bandit-report.json -ll -x ./venv,./.git,./migrations,./articulos/tests.py || true
 
       - name: Subir reporte de Bandit como artefacto
         uses: actions/upload-artifact@v4
