@@ -1,0 +1,32 @@
+{%extends "base.html"%}
+{%block contenido%}
+{%load static%}
+<div class="container">
+    <h3>Detalle de compra</h3><br><h6>Fecha: {{fecha}}</h6>
+    <hr>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Codigo boleta</th>
+                <th>Codigo producto</th>
+                <th>Cantidad</th>
+                <th>Nombre</th>
+            </tr>
+        </thead>
+        <tbody>
+            {%for prod in productos%}
+            <tr>
+                <td>{{prod.id_boleta}}</td>
+                <td>{{prod.id_producto.productoId}}</td>
+                <td>{{prod.cantidad}}</td>
+                <td>{{prod.id_producto}}</td>
+            </tr>
+            {%endfor%}
+        </tbody>
+
+        <tr><td><h6>Total compra: {{total}}</h6></td>
+        </tr>
+    </table>
+    <a href="{%url 'tienda'%}" class="btn btn-dark">Volver</a>
+</div>
+{%endblock%}
