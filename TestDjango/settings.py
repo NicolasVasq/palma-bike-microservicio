@@ -21,12 +21,17 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-2kgt+u+q@%9_4mpj^1m4n$=41c_6crp7)hfv_y&w^v=9@ebs$n'
+SECRET_KEY = os.environ.get(
+    'SECRET_KEY',
+    'django-insecure-2kgt+u+q@%9_4mpj^1m4n$=41c_6crp7)hfv_y&w^v=9@ebs$n'
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'True').lower() in ('true', '1', 'yes')
 
-ALLOWED_HOSTS = []
+# Hosts permitidos: se configura por variable de entorno para contenedores/cloud.
+_allowed_hosts_env = os.environ.get('ALLOWED_HOSTS', '*')
+ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_env.split(',') if h.strip()]
 
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = '/'
@@ -152,7 +157,7 @@ EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'palmabike43@gmail.com'
-EMAIL_HOST_PASSWORD = 'tmrd iitz imiq zqxm'
-DEFAULT_FROM_EMAIL = 'palmabike43@gmail.com'
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'palmabike43@gmail.com')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'palmabike43@gmail.com')
 EMAIL_SUBJECT_PREFIX = '[PalmaBike] '

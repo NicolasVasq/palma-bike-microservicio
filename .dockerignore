@@ -1,0 +1,37 @@
+# Entornos virtuales
+venv/
+env/
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Bases de datos y archivos locales
+db.sqlite3
+db.sqlite3-journal
+*.sqlite3
+
+# Archivos de medios generados por usuarios
+files/imagenes/*
+!files/imagenes/.gitkeep
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# GitHub
+.github/
+
+# Documentos y recursos que no se necesitan en la imagen
+*.pdf
+*.docx
+*.rar
+*.zip
+
+# IDEs
+.vscode/
+.idea/
+*.swp

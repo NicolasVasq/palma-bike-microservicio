@@ -38,7 +38,11 @@ Este microservicio fue desarrollado previamente en asignaturas anteriores y ahor
 - **crispy-bootstrap4** 2025.6
 - **Pillow** 13.0
 - **SQLite** (base de datos por defecto en desarrollo)
+- **Docker** / **Docker Compose** (contenerización y orquestación local)
 - **GitHub Actions** (CI/CD)
+- **pytest-django** (pruebas automatizadas)
+- **Bandit** y **Trivy** (análisis de seguridad)
+- **Dependabot** (gestión de dependencias)
 
 ---
 
@@ -197,13 +201,111 @@ Este workflow es el primer paso hacia un pipeline de CI/CD completo.
 
 ---
 
+## Contenerización
+
+El proyecto incluye un `Dockerfile` basado en `python:3.13-alpine` para generar una imagen ligera y segura, junto con un `.dockerignore` que excluye archivos innecesarios.
+
+### Imagen Docker
+
+```bash
+# Construir imagen
+docker build -t palma-bike:latest .
+
+# Ejecutar contenedor
+docker run -p 8000:8000 palma-bike:latest
+```
+
+La imagen aplica migraciones automáticamente al iniciar y expone el servicio en el puerto `8000`.
+
+---
+
+## Orquestación con Docker Compose
+
+El archivo `docker-compose.yml` permite levantar el microservicio de forma orquestada:
+
+```bash
+docker compose up -d
+```
+
+Incluye:
+- Construcción automática de la imagen.
+- Variables de entorno para configuración dinámica.
+- Healthcheck periódico del servicio.
+- Política de reinicio `unless-stopped`.
+
+Para detener:
+
+```bash
+docker compose down
+```
+
+---
+
+## Pruebas automatizadas
+
+Se implementaron pruebas unitarias con **pytest-django**.
+
+```bash
+pytest
+```
+
+Las pruebas actuales cubren:
+- Creación de marcas y productos.
+- Validación de restricciones del modelo (stock no negativo).
+- Respuesta de las vistas de inicio y nosotros.
+
+---
+
+## Seguridad
+
+El pipeline integra múltiples capas de seguridad:
+
+- **Bandit**: análisis estático del código Python. Bloquea el pipeline si detecta problemas de severidad MEDIA o superior.
+- **Trivy**: escaneo de vulnerabilidades en la imagen Docker. Genera un reporte SARIF como artefacto; actualmente se ejecuta en modo alerta para no detener el pipeline por vulnerabilidades sin parche.
+- **Dependabot**: revisa semanalmente las dependencias de Python y GitHub Actions, generando pull requests automáticos cuando existen actualizaciones.
+- **SonarCloud**: el repositorio incluye `sonar-project.properties` preparado para análisis de calidad de código. El job correspondiente se habilita automáticamente agregando el secret `SONAR_TOKEN` en el repositorio.
+
+Si cualquier análisis crítico de seguridad falla, el pipeline se bloquea y no continúa hacia el despliegue.
+
+---
+
+## Despliegue automatizado simulado
+
+Como parte del pipeline, una vez aprobados los pasos de tests, build y seguridad, se realiza un despliegue simulado con Docker Compose dentro del runner de GitHub Actions:
+
+1. Se levanta el servicio con `docker compose up -d --build`.
+2. Se espera el inicio del contenedor.
+3. Se verifica la salud del servicio con `curl`.
+4. Se ejecuta `python manage.py check` dentro del contenedor.
+5. Se detienen los servicios con `docker compose down`.
+
+Este flujo garantiza trazabilidad y validación del artefacto generado antes de considerarlo listo para un entorno real.
+
+---
+
+## Variables de entorno
+
+| Variable | Descripción | Valor por defecto |
+|----------|-------------|-------------------|
+| `SECRET_KEY` | Clave secreta de Django | Valor de desarrollo |
+| `DEBUG` | Modo depuración | `True` |
+| `ALLOWED_HOSTS` | Hosts permitidos | `*` |
+| `EMAIL_HOST_USER` | Usuario SMTP | `palmabike43@gmail.com` |
+| `EMAIL_HOST_PASSWORD` | Contraseña SMTP | Vacío |
+| `DEFAULT_FROM_EMAIL` | Remitente por defecto | `palmabike43@gmail.com` |
+
+> **Nota:** en producción se deben sobrescribir todas las variables sensibles mediante secretos del orquestador.
+
+---
+
 ## Créditos y uso de IA
 
 - Proyecto base: **Palma Bike WEB**, desarrollado en asignaturas previas.
-- Adaptación para flujo DevOps: realizado como Evaluación Parcial N°1 de la asignatura Ingeniería DevOps (DOY0101).
+- Adaptación para flujo DevOps y CI/CD: realizado como Evaluación Parcial N°1 y N°2 de la asignatura Ingeniería DevOps (DOY0101).
 - Se utilizó asistencia de IA (ChatGPT / OpenCode) para:
   - Mejorar la redacción de la documentación.
   - Estructurar el flujo de trabajo DevOps y la estrategia de ramificación.
+  - Diseñar el pipeline de CI/CD y los archivos de contenerización.
 - Las justificaciones técnicas, análisis y conclusiones son responsabilidad del estudiante.
 
 ---
