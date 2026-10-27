@@ -61,7 +61,7 @@ jobs:
         run: bandit -r . -f json -o bandit-report.json -ll -x ./venv,./.git,./migrations,./articulos/tests.py || true
 
       - name: Subir reporte de Bandit como artefacto
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bandit-report
           path: bandit-report.json
@@ -95,7 +95,7 @@ jobs:
           ignore-unfixed: true
 
       - name: Subir reporte de Trivy como artefacto
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: trivy-results
