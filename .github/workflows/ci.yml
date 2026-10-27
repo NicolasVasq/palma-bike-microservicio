@@ -1,4 +1,4 @@
-name: Django CI
+name: CI/CD Pipeline
 
 on:
   push:
@@ -9,7 +9,11 @@ on:
       - main
 
 jobs:
-  build:
+  # ------------------------------------------------------------------
+  # 1. Pruebas automatizadas y validación del proyecto Django
+  # ------------------------------------------------------------------
+  test:
+    name: Validación y pruebas
     runs-on: ubuntu-latest
 
     steps:
@@ -26,8 +30,123 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Ejecutar pruebas unitarias con pytest
+        run: pytest
+
       - name: Verificar configuración de Django
         run: python manage.py check
 
       - name: Validar migraciones pendientes
         run: python manage.py makemigrations --check --dry-run
+
+  # ------------------------------------------------------------------
+  # 2. Análisis de seguridad del código fuente
+  # ------------------------------------------------------------------
+  security-code:
+    name: Análisis estático de seguridad
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Instalar Bandit
+        run: pip install bandit
+
+      - name: Ejecutar Bandit (bloquea en severidad MEDIA o superior)
+        run: bandit -r . -ii -x ./venv,./.git,./migrations
+
+      - name: Guardar reporte JSON de Bandit
+        run: bandit -r . -f json -o bandit-report.json -x ./venv,./.git,./migrations || true
+
+      - name: Subir reporte de Bandit como artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: bandit-report.json
+
+  # ------------------------------------------------------------------
+  # 3. Análisis de código con SonarCloud (opcional, requiere SONAR_TOKEN)
+  # ------------------------------------------------------------------
+  sonarcloud:
+    name: SonarCloud Scan
+    runs-on: ubuntu-latest
+    needs: test
+    if: secrets.SONAR_TOKEN != ''
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  # ------------------------------------------------------------------
+  # 4. Construcción de imagen Docker y escaneo de vulnerabilidades
+  # ------------------------------------------------------------------
+  build-and-scan:
+    name: Build Docker y escaneo Trivy
+    runs-on: ubuntu-latest
+    needs: [test, security-code]
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Construir imagen Docker
+        run: docker build -t palma-bike:latest .
+
+      - name: Escanear imagen con Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'palma-bike:latest'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
+
+      - name: Subir reporte de Trivy como artefacto
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: trivy-results
+          path: trivy-results.sarif
+
+  # ------------------------------------------------------------------
+  # 5. Despliegue automatizado en entorno simulado (Docker Compose)
+  # ------------------------------------------------------------------
+  deploy-simulated:
+    name: Despliegue simulado con Docker Compose
+    runs-on: ubuntu-latest
+    needs: build-and-scan
+    if: github.ref == 'refs/heads/develop' || github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Levantar servicios con Docker Compose
+        run: docker compose up -d --build
+
+      - name: Esperar inicio del servicio
+        run: sleep 15
+
+      - name: Verificar salud del servicio
+        run: |
+          curl --fail --silent http://localhost:8000/ || exit 1
+
+      - name: Verificar comando de administración Django
+        run: docker compose exec -T web python manage.py check
+
+      - name: Detener servicios
+        if: always()
+        run: docker compose down
