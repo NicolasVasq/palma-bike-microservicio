@@ -1,5 +1,5 @@
-# Imagen base ligera de Python 3.13
-FROM python:3.13-slim
+# Imagen base ligera de Python 3.13 sobre Alpine Linux
+FROM python:3.13-alpine
 
 # Directorio de trabajo dentro del contenedor
 WORKDIR /app
@@ -9,10 +9,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PORT=8000
 
-# Instalar dependencias del sistema si fueran necesarias (compatibilidad con Pillow, etc.)
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends gcc libjpeg-dev zlib1g-dev \
-    && rm -rf /var/lib/apt/lists/*
+# Instalar dependencias del sistema necesarias para compilar Pillow y otros paquetes
+RUN apk add --no-cache --virtual .build-deps \
+    gcc \
+    musl-dev \
+    libjpeg-turbo-dev \
+    zlib-dev \
+    && apk add --no-cache \
+    curl \
+    libjpeg-turbo \
+    zlib
 
 # Instalar dependencias de Python
 COPY requirements.txt .
@@ -24,6 +30,9 @@ COPY . .
 
 # Crear carpetas para archivos de medios si no existen
 RUN mkdir -p /app/files/imagenes
+
+# Limpiar dependencias de compilación para reducir superficie de ataque
+RUN apk del .build-deps
 
 # Puerto expuesto por el contenedor
 EXPOSE 8000
