@@ -29,5 +29,5 @@ jobs:
       - name: Verificar configuración de Django
         run: python manage.py check
 
-      - name: Validar migraciones
-        run: python manage.py migrate --check
+      - name: Validar migraciones pendientes
+        run: python manage.py makemigrations --check --dry-run
