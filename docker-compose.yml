@@ -1,5 +1,9 @@
 version: '3.9'
 
+networks:
+  palma-bike-network:
+    driver: bridge
+
 services:
   web:
     build:
@@ -11,7 +15,11 @@ services:
     environment:
       - DEBUG=True
       - ALLOWED_HOSTS=*
-      - SECRET_KEY=django-insecure-2kgt+u+q@%9_4mpj^1m4n$=41c_6crp7)hfv_y&w^v=9@ebs$n
+      - SECRET_KEY=${SECRET_KEY}
+      - TEST_COVERAGE=${TEST_COVERAGE:-0}
+      - DEPLOYMENT_DURATION=${DEPLOYMENT_DURATION:-0}
+      - BUILD_TIMESTAMP=${BUILD_TIMESTAMP:-0}
+      - GITHUB_SHA=${GITHUB_SHA:-unknown}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/"]
@@ -19,3 +27,38 @@ services:
       timeout: 10s
       retries: 3
       start_period: 20s
+    networks:
+      - palma-bike-network
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    container_name: palma-bike-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    networks:
+      - palma-bike-network
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: palma-bike-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    networks:
+      - palma-bike-network

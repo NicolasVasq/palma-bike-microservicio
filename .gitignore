@@ -49,3 +49,7 @@ Thumbs.db
 files/imagenes/*
 !files/imagenes/.gitkeep
 ep1_detalle.txt
+ep3_detalle.txt
+*.pdf
+.coverage
+coverage.xml

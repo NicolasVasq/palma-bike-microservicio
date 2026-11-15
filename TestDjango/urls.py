@@ -19,6 +19,8 @@ from django.urls import path,include
 from django.conf import settings
 from django.conf.urls.static import static
 
+from monitoring.metrics_view import custom_metrics
+
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -26,5 +28,7 @@ urlpatterns = [
     path('accounts/',include('django.contrib.auth.urls')),
     path('articulos/',include('articulos.urls')),
     path('cuentas/',include('cuentas.urls')),
+    path('', include('django_prometheus.urls')),
+    path('custom-metrics/', custom_metrics, name='custom-metrics'),
 ]+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
