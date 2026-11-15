@@ -28,7 +28,7 @@ jobs:
 
     steps:
       - name: Checkout del código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Configurar Python
         uses: actions/setup-python@v5
@@ -50,7 +50,7 @@ jobs:
 
     steps:
       - name: Checkout del código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Configurar Python
         uses: actions/setup-python@v5
@@ -95,7 +95,7 @@ jobs:
 
     steps:
       - name: Checkout del código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Instalar Bandit
         run: pip install bandit
@@ -126,7 +126,7 @@ jobs:
 
     steps:
       - name: Checkout del código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Establecer marca de tiempo de build
         run: echo "BUILD_TIMESTAMP=$(date +%s)" >> "$GITHUB_ENV"
@@ -197,7 +197,7 @@ jobs:
 
     steps:
       - name: Checkout del código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Establecer variables del entorno de métricas
         run: |
