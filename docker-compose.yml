@@ -15,7 +15,11 @@ services:
     environment:
       - DEBUG=True
       - ALLOWED_HOSTS=*
-      - SECRET_KEY=django-insecure-2kgt+u+q@%9_4mpj^1m4n$=41c_6crp7)hfv_y&w^v=9@ebs$n
+      - SECRET_KEY=${SECRET_KEY}
+      - TEST_COVERAGE=${TEST_COVERAGE:-0}
+      - DEPLOYMENT_DURATION=${DEPLOYMENT_DURATION:-0}
+      - BUILD_TIMESTAMP=${BUILD_TIMESTAMP:-0}
+      - GITHUB_SHA=${GITHUB_SHA:-unknown}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/"]

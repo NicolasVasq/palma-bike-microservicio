@@ -3,18 +3,49 @@ name: CI/CD Pipeline
 on:
   push:
     branches:
+      - main
       - develop
+      - 'feature/*'
+      - 'hotfix/*'
   pull_request:
     branches:
       - main
+      - develop
+
+env:
+  SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+  DEBUG: "False"
+  DOCKER_IMAGE: nicolasvasq/palma-bike-microservicio
 
 jobs:
   # ------------------------------------------------------------------
-  # 1. Pruebas automatizadas y validación del proyecto Django
+  # 1. Auditoría de cumplimiento normativo
+  # ------------------------------------------------------------------
+  compliance:
+    name: Auditoría de cumplimiento
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Ejecutar auditoría de cumplimiento
+        run: python scripts/compliance_audit.py
+
+  # ------------------------------------------------------------------
+  # 2. Pruebas automatizadas y validación del proyecto Django
   # ------------------------------------------------------------------
   test:
     name: Validación y pruebas
     runs-on: ubuntu-latest
+    needs: compliance
+    outputs:
+      coverage_percent: ${{ steps.coverage.outputs.coverage }}
 
     steps:
       - name: Checkout del código
@@ -30,8 +61,22 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Ejecutar pruebas unitarias con pytest
-        run: pytest
+      - name: Ejecutar pruebas unitarias con pytest y cobertura
+        run: |
+          pytest --cov=. --cov-report=xml --cov-report=term
+
+      - name: Extraer porcentaje de cobertura
+        id: coverage
+        run: |
+          COVERAGE=$(python -c "import xml.etree.ElementTree as ET; print(ET.parse('coverage.xml').getroot().get('line-rate'))")
+          COVERAGE_PERCENT=$(python -c "print(f'{float('$COVERAGE')*100:.2f}')")
+          echo "coverage=$COVERAGE_PERCENT" >> "$GITHUB_OUTPUT"
+
+      - name: Subir reporte de cobertura como artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
 
       - name: Verificar configuración de Django
         run: python manage.py check
@@ -40,7 +85,7 @@ jobs:
         run: python manage.py makemigrations --check --dry-run
 
   # ------------------------------------------------------------------
-  # 2. Análisis de seguridad del código fuente
+  # 3. Análisis de seguridad del código fuente
   # ------------------------------------------------------------------
   security-code:
     name: Análisis estático de seguridad
@@ -67,32 +112,71 @@ jobs:
           path: bandit-report.json
 
   # ------------------------------------------------------------------
-  # 3. Construcción de imagen Docker y escaneo de vulnerabilidades
+  # 4. Construcción de imagen Docker, escaneo y publicación
   # ------------------------------------------------------------------
   build-and-scan:
-    name: Build Docker y escaneo Trivy
+    name: Build Docker, escaneo Trivy y publicación
     runs-on: ubuntu-latest
-    needs: [test, security-code]
+    needs: [compliance, test, security-code]
+
+    outputs:
+      deployment_duration: ${{ steps.duration.outputs.deployment_duration }}
+      image_tag: ${{ steps.meta.outputs.image_tag }}
 
     steps:
       - name: Checkout del código
         uses: actions/checkout@v4
 
+      - name: Establecer marca de tiempo de build
+        run: echo "BUILD_TIMESTAMP=$(date +%s)" >> "$GITHUB_ENV"
+
+      - name: Calcular tag de imagen
+        id: meta
+        run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          echo "image_tag=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "IMAGE_TAG=${SHORT_SHA}" >> "$GITHUB_ENV"
+
+      - name: Iniciar medición de duración
+        id: start
+        run: echo "start_time=$(date +%s)" >> "$GITHUB_OUTPUT"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Construir imagen Docker
-        run: docker build -t palma-bike:latest .
+      - name: Login a DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Escanear imagen con Trivy
+      - name: Construir y publicar imagen Docker
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.DOCKER_IMAGE }}:${{ env.IMAGE_TAG }}
+            ${{ env.DOCKER_IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Escanear imagen con Trivy (bloquea en CRITICAL/HIGH)
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: 'palma-bike:latest'
+          image-ref: '${{ env.DOCKER_IMAGE }}:${{ env.IMAGE_TAG }}'
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
-          exit-code: '0'
+          exit-code: '1'
           ignore-unfixed: true
+
+      - name: Finalizar medición de duración
+        id: duration
+        run: |
+          END_TIME=$(date +%s)
+          DURATION=$((END_TIME - ${{ steps.start.outputs.start_time }}))
+          echo "deployment_duration=${DURATION}" >> "$GITHUB_OUTPUT"
 
       - name: Subir reporte de Trivy como artefacto
         uses: actions/upload-artifact@v4
@@ -105,16 +189,22 @@ jobs:
   # 5. Despliegue automatizado en entorno simulado (Docker Compose)
   # ------------------------------------------------------------------
   deploy-simulated:
-    name: Despliegue simulado con Docker Compose
+    name: Despliegue simulado con Docker Compose y monitoreo
     runs-on: ubuntu-latest
     needs: build-and-scan
-    if: github.ref == 'refs/heads/develop' || github.event_name == 'pull_request'
 
     steps:
       - name: Checkout del código
         uses: actions/checkout@v4
 
+      - name: Establecer variables del entorno de métricas
+        run: |
+          echo "BUILD_TIMESTAMP=$(date +%s)" >> "$GITHUB_ENV"
+
       - name: Levantar servicios con Docker Compose
+        env:
+          TEST_COVERAGE: ${{ needs.test.outputs.coverage_percent }}
+          DEPLOYMENT_DURATION: ${{ needs.build-and-scan.outputs.deployment_duration }}
         run: docker compose up -d --build
 
       - name: Esperar inicio del servicio
@@ -123,6 +213,18 @@ jobs:
       - name: Verificar salud del servicio
         run: |
           curl --fail --silent http://localhost:8000/ || exit 1
+
+      - name: Verificar endpoint de métricas Prometheus
+        run: |
+          curl --fail --silent http://localhost:8000/metrics | grep -q "django_http_requests_total"
+
+      - name: Verificar métricas personalizadas
+        run: |
+          curl --fail --silent http://localhost:8000/custom-metrics/ | grep -q "palma_bike_test_coverage_percent"
+
+      - name: Verificar panel de Grafana
+        run: |
+          curl --fail --silent http://localhost:3000/api/health || exit 1
 
       - name: Verificar comando de administración Django
         run: docker compose exec -T web python manage.py check
