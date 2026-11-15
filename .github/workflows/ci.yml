@@ -15,7 +15,8 @@ on:
 env:
   SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
   DEBUG: "False"
-  DOCKER_IMAGE: nicolasvasq/palma-bike-microservicio
+  REGISTRY: ghcr.io
+  IMAGE_NAME: palma-bike-microservicio
 
 jobs:
   # ------------------------------------------------------------------
@@ -144,11 +145,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login a DockerHub
+      - name: Login a GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Construir y publicar imagen Docker
         uses: docker/build-push-action@v6
@@ -156,15 +158,15 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ env.DOCKER_IMAGE }}:${{ env.IMAGE_TAG }}
-            ${{ env.DOCKER_IMAGE }}:latest
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Escanear imagen con Trivy (bloquea en CRITICAL/HIGH)
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: '${{ env.DOCKER_IMAGE }}:${{ env.IMAGE_TAG }}'
+          image-ref: '${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}'
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
