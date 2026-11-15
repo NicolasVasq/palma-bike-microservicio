@@ -22,7 +22,7 @@ spec:
     spec:
       containers:
         - name: palma-bike
-          image: nicolasvasq/palma-bike-microservicio:latest
+          image: ghcr.io/nicolasvasq/palma-bike-microservicio:latest
           imagePullPolicy: Always
           ports:
             - name: http

@@ -13,7 +13,10 @@ Plataforma web de comercio electrónico para una tienda de bicicletas y repuesto
 5. [Flujo de trabajo DevOps](#flujo-de-trabajo-devops)
 6. [Convenciones del repositorio](#convenciones-del-repositorio)
 7. [Automatización con GitHub Actions](#automatización-con-github-actions)
-8. [Créditos y uso de IA](#créditos-y-uso-de-ia)
+8. [Observabilidad y monitoreo](#observabilidad-y-monitoreo)
+9. [Orquestación con Kubernetes](#orquestación-con-kubernetes)
+10. [Auditoría de cumplimiento](#auditoría-de-cumplimiento)
+11. [Créditos y uso de IA](#créditos-y-uso-de-ia)
 
 ---
 
@@ -40,9 +43,11 @@ Este microservicio fue desarrollado previamente en asignaturas anteriores y ahor
 - **SQLite** (base de datos por defecto en desarrollo)
 - **Docker** / **Docker Compose** (contenerización y orquestación local)
 - **GitHub Actions** (CI/CD)
-- **pytest-django** (pruebas automatizadas)
+- **pytest-django** y **pytest-cov** (pruebas automatizadas y cobertura)
 - **Bandit** y **Trivy** (análisis de seguridad)
 - **Dependabot** (gestión de dependencias)
+- **Prometheus** y **Grafana** (métricas y dashboards)
+- **Kubernetes** (orquestación en la nube)
 
 ---
 
@@ -65,10 +70,16 @@ source venv/bin/activate
 # 3. Instalar dependencias
 pip install -r requirements.txt
 
-# 4. Aplicar migraciones
+# 4. Definir SECRET_KEY de Django
+# Windows PowerShell
+$env:SECRET_KEY='django-insecure-cambiar-en-produccion'
+# Linux / macOS
+export SECRET_KEY='django-insecure-cambiar-en-produccion'
+
+# 5. Aplicar migraciones
 python manage.py migrate
 
-# 5. Ejecutar servidor de desarrollo
+# 6. Ejecutar servidor de desarrollo
 python manage.py runserver
 ```
 
@@ -182,22 +193,20 @@ Ejemplos:
 
 ## Automatización con GitHub Actions
 
-El repositorio incluye un workflow básico de CI ubicado en `.github/workflows/ci.yml`.
+El pipeline completo se encuentra en `.github/workflows/ci.yml` y se ejecuta en cada push a `main`, `develop`, `feature/*` o `hotfix/*`, y en cada pull request hacia `main` o `develop`.
 
 ### Disparadores
 
-- Cada push a la rama `develop`.
-- Cada pull request dirigido a la rama `main`.
+- Push a `main`, `develop`, `feature/*` y `hotfix/*`.
+- Pull requests dirigidos a `main` o `develop`.
 
-### Tareas
+### Jobs del pipeline
 
-- Checkout del código.
-- Configuración de Python 3.13.
-- Instalación de dependencias desde `requirements.txt`.
-- Validación de sintaxis con `manage.py check`.
-- Ejecución de migraciones para confirmar consistencia del modelo.
-
-Este workflow es el primer paso hacia un pipeline de CI/CD completo.
+1. **Auditoría de cumplimiento**: ejecuta `scripts/compliance_audit.py` y bloquea el pipeline si detecta secretos versionados, archivos `.env` commiteados o funciones peligrosas.
+2. **Validación y pruebas**: instala dependencias, ejecuta `pytest --cov`, genera `coverage.xml`, verifica `manage.py check` y valida migraciones pendientes.
+3. **Análisis estático de seguridad**: ejecuta Bandit en el código Python. Bloquea el pipeline ante severidad MEDIA o superior.
+4. **Build, escaneo y publicación**: construye una imagen Docker, la publica en GitHub Container Registry (`ghcr.io`) y la escanea con Trivy. Si encuentra vulnerabilidades CRITICAL/HIGH, detiene el pipeline.
+5. **Despliegue simulado con monitoreo**: levanta el servicio con Docker Compose, verifica salud, métricas Prometheus (`/metrics`), métricas personalizadas (`/custom-metrics/`) y la disponibilidad de Grafana.
 
 ---
 
@@ -261,51 +270,140 @@ Las pruebas actuales cubren:
 El pipeline integra múltiples capas de seguridad:
 
 - **Bandit**: análisis estático del código Python. Bloquea el pipeline si detecta problemas de severidad MEDIA o superior.
-- **Trivy**: escaneo de vulnerabilidades en la imagen Docker. Genera un reporte SARIF como artefacto; actualmente se ejecuta en modo alerta para no detener el pipeline por vulnerabilidades sin parche.
+- **Trivy**: escaneo de vulnerabilidades en la imagen Docker. Publica un reporte SARIF como artefacto y detiene el pipeline si detecta vulnerabilidades CRITICAL o HIGH.
+- **Auditoría de cumplimiento**: script propio que verifica secretos hardcodeados, archivos `.env` versionados, versionado explícito de dependencias y uso de `eval/exec`.
 - **Dependabot**: revisa semanalmente las dependencias de Python y GitHub Actions, generando pull requests automáticos cuando existen actualizaciones.
-- **SonarCloud**: el repositorio incluye `sonar-project.properties` preparado para análisis de calidad de código. El job correspondiente se habilita automáticamente agregando el secret `SONAR_TOKEN` en el repositorio.
+- **SonarCloud/SonarQube**: el repositorio incluye `sonar-project.properties` preparado para análisis de calidad de código. El job correspondiente se habilita automáticamente agregando el secret `SONAR_TOKEN` en el repositorio.
 
-Si cualquier análisis crítico de seguridad falla, el pipeline se bloquea y no continúa hacia el despliegue.
+Si cualquier análisis crítico de seguridad o cumplimiento falla, el pipeline se bloquea y no continúa hacia el despliegue.
 
 ---
 
 ## Despliegue automatizado simulado
 
-Como parte del pipeline, una vez aprobados los pasos de tests, build y seguridad, se realiza un despliegue simulado con Docker Compose dentro del runner de GitHub Actions:
+Como parte del pipeline, una vez aprobados tests, build y seguridad, se realiza un despliegue simulado con Docker Compose dentro del runner de GitHub Actions:
 
 1. Se levanta el servicio con `docker compose up -d --build`.
 2. Se espera el inicio del contenedor.
 3. Se verifica la salud del servicio con `curl`.
-4. Se ejecuta `python manage.py check` dentro del contenedor.
-5. Se detienen los servicios con `docker compose down`.
+4. Se validan los endpoints `/metrics` y `/custom-metrics/`.
+5. Se verifica la salud de Grafana en el puerto `3000`.
+6. Se ejecuta `python manage.py check` dentro del contenedor.
+7. Se detienen los servicios con `docker compose down`.
 
 Este flujo garantiza trazabilidad y validación del artefacto generado antes de considerarlo listo para un entorno real.
 
 ---
 
+## Observabilidad y monitoreo
+
+El microservicio expone métricas en `/metrics` gracias a `django-prometheus` y métricas personalizadas en `/custom-metrics/` que reflejan cobertura de pruebas, duración del despliegue y commit de git.
+
+La pila de monitoreo se levanta junto con la aplicación:
+
+```bash
+export SECRET_KEY='django-insecure-cambiar-en-produccion'
+docker compose up -d
+```
+
+Servicios disponibles:
+
+| Servicio   | URL                      | Descripción                                |
+|------------|--------------------------|--------------------------------------------|
+| Web        | http://localhost:8000    | Microservicio Django                       |
+| Prometheus | http://localhost:9090    | Recolección de series temporales           |
+| Grafana    | http://localhost:3000   | Dashboards de DevOps (usuario `admin` / `admin123`) |
+
+### Dashboard incluido
+
+El dashboard `Palma Bike - DevOps Dashboard` se provisiona automáticamente en Grafana e incluye:
+
+- Disponibilidad del servicio (`up`).
+- Cobertura de pruebas (`palma_bike_test_coverage_percent`).
+- Tiempo de despliegue (`palma_bike_deployment_duration_seconds`).
+- Errores registrados (`django_http_exceptions_total`).
+- Requests por segundo y latencia promedio.
+- Uso de CPU y memoria del contenedor.
+
+Los archivos de configuración se encuentran en `monitoring/`.
+
+---
+
+## Orquestación con Kubernetes
+
+La carpeta `k8s/` contiene los manifiestos necesarios para desplegar el microservicio en un clúster de Kubernetes (EKS, GKE, AKS, minikube, kind, etc.):
+
+```bash
+kubectl apply -f k8s/
+```
+
+Incluye:
+
+- `01-namespace.yml`: namespace `palma-bike`.
+- `02-configmap.yml`: variables no sensibles (`DEBUG`, `ALLOWED_HOSTS`).
+- `03-secret.yml`: placeholder de `SECRET_KEY` (reemplazar en producción).
+- `05-deployment.yml`: despliegue con 2 réplicas, healthchecks y recursos.
+- `06-service.yml`: servicio tipo `LoadBalancer`.
+- `07-hpa.yml`: autoescalado horizontal según CPU y memoria.
+
+La imagen del contenedor se publica en GitHub Container Registry como:
+
+```text
+ghcr.io/nicolasvasq/palma-bike-microservicio:latest
+```
+
+> Ver `k8s/README.md` para instrucciones detalladas.
+
+---
+
+## Auditoría de cumplimiento
+
+El script `scripts/compliance_audit.py` verifica políticas mínimas de seguridad y calidad:
+
+- No versionar secretos hardcodeados.
+- No incluir archivos `.env` en el repositorio.
+- No usar dependencias sin versionar.
+- No usar funciones peligrosas (`eval` / `exec`).
+- No dejar `DEBUG=True` en las ramas principales (`main` / `master`).
+
+Puede ejecutarse localmente:
+
+```bash
+export SECRET_KEY='django-insecure-cambiar-en-produccion'
+python scripts/compliance_audit.py
+```
+
+Si detecta alguna falla crítica, el pipeline se detiene automáticamente.
+
+---
+
 ## Variables de entorno
 
-| Variable | Descripción | Valor por defecto |
-|----------|-------------|-------------------|
-| `SECRET_KEY` | Clave secreta de Django | Valor de desarrollo |
-| `DEBUG` | Modo depuración | `True` |
-| `ALLOWED_HOSTS` | Hosts permitidos | `*` |
-| `EMAIL_HOST_USER` | Usuario SMTP | `palmabike43@gmail.com` |
-| `EMAIL_HOST_PASSWORD` | Contraseña SMTP | Vacío |
-| `DEFAULT_FROM_EMAIL` | Remitente por defecto | `palmabike43@gmail.com` |
+| Variable | Descripción | Requerida en producción |
+|----------|-------------|------------------------|
+| `SECRET_KEY` | Clave secreta de Django | Sí |
+| `DEBUG` | Modo depuración | Sí |
+| `ALLOWED_HOSTS` | Hosts permitidos | Sí |
+| `TEST_COVERAGE` | Porcentaje de cobertura expuesto en métricas | No |
+| `DEPLOYMENT_DURATION` | Duración del despliegue en segundos | No |
+| `BUILD_TIMESTAMP` | Timestamp UNIX del build | No |
+| `GITHUB_SHA` | Hash del commit en el build | No |
+| `EMAIL_HOST_USER` | Usuario SMTP | Sí |
+| `EMAIL_HOST_PASSWORD` | Contraseña SMTP | Sí |
+| `DEFAULT_FROM_EMAIL` | Remitente por defecto | Sí |
 
-> **Nota:** en producción se deben sobrescribir todas las variables sensibles mediante secretos del orquestador.
+> **Nota:** en producción se deben sobrescribir todas las variables sensibles mediante secretos del orquestador (Kubernetes Secrets, GitHub Actions secrets, etc.).
 
 ---
 
 ## Créditos y uso de IA
 
 - Proyecto base: **Palma Bike WEB**, desarrollado en asignaturas previas.
-- Adaptación para flujo DevOps y CI/CD: realizado como Evaluación Parcial N°1 y N°2 de la asignatura Ingeniería DevOps (DOY0101).
+- Adaptación para flujo DevOps y CI/CD: realizado como Evaluación Parcial N°1, N°2 y N°3 de la asignatura Ingeniería DevOps (DOY0101).
 - Se utilizó asistencia de IA (ChatGPT / OpenCode) para:
   - Mejorar la redacción de la documentación.
   - Estructurar el flujo de trabajo DevOps y la estrategia de ramificación.
-  - Diseñar el pipeline de CI/CD y los archivos de contenerización.
+  - Diseñar el pipeline de CI/CD, archivos de contenerización, monitoreo con Prometheus/Grafana, manifiestos de Kubernetes y políticas de auditoría.
 - Las justificaciones técnicas, análisis y conclusiones son responsabilidad del estudiante.
 
 ---
