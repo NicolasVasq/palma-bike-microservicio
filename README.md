@@ -270,7 +270,7 @@ Las pruebas actuales cubren:
 El pipeline integra múltiples capas de seguridad:
 
 - **Bandit**: análisis estático del código Python. Bloquea el pipeline si detecta problemas de severidad MEDIA o superior.
-- **Trivy**: escaneo de vulnerabilidades en la imagen Docker. Publica un reporte SARIF como artefacto y detiene el pipeline si detecta vulnerabilidades CRITICAL o HIGH.
+- **Trivy**: escaneo de vulnerabilidades en la imagen Docker. Publica un reporte SARIF como artefacto para análisis y trazabilidad.
 - **Auditoría de cumplimiento**: script propio que verifica secretos hardcodeados, archivos `.env` versionados, versionado explícito de dependencias y uso de `eval/exec`.
 - **Dependabot**: revisa semanalmente las dependencias de Python y GitHub Actions, generando pull requests automáticos cuando existen actualizaciones.
 - **SonarCloud/SonarQube**: el repositorio incluye `sonar-project.properties` preparado para análisis de calidad de código. El job correspondiente se habilita automáticamente agregando el secret `SONAR_TOKEN` en el repositorio.
