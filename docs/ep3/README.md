@@ -62,7 +62,7 @@ El dashboard de Grafana incluye:
 ### IE6. Demostrar detención del pipeline ante falla crítica
 
 - Bandit se ejecuta con severidad mínima MEDIA y detiene el pipeline.
-- Trivy escanea vulnerabilidades CRITICAL/HIGH y detiene el pipeline.
+- Trivy escanea vulnerabilidades CRITICAL/HIGH y genera un reporte SARIF.
 - El script de auditoría de cumplimiento retorna código de salida `1` ante problemas críticos.
 
 ## Instrucciones de ejecución local de la pila de monitoreo
