@@ -205,7 +205,7 @@ El pipeline completo se encuentra en `.github/workflows/ci.yml` y se ejecuta en 
 1. **Auditoría de cumplimiento**: ejecuta `scripts/compliance_audit.py` y bloquea el pipeline si detecta secretos versionados, archivos `.env` commiteados o funciones peligrosas.
 2. **Validación y pruebas**: instala dependencias, ejecuta `pytest --cov`, genera `coverage.xml`, verifica `manage.py check` y valida migraciones pendientes.
 3. **Análisis estático de seguridad**: ejecuta Bandit en el código Python. Bloquea el pipeline ante severidad MEDIA o superior.
-4. **Build, escaneo y publicación**: construye una imagen Docker, la publica en GitHub Container Registry (`ghcr.io`) y la escanea con Trivy. Si encuentra vulnerabilidades CRITICAL/HIGH, detiene el pipeline.
+4. **Build, escaneo y publicación**: construye una imagen Docker, la publica en GitHub Container Registry (`ghcr.io`) y la escanea con Trivy. El reporte SARIF se almacena como artefacto.
 5. **Despliegue simulado con monitoreo**: levanta el servicio con Docker Compose, verifica salud, métricas Prometheus (`/metrics`), métricas personalizadas (`/custom-metrics/`) y la disponibilidad de Grafana.
 
 ---
