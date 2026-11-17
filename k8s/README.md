@@ -38,4 +38,4 @@ Abrir http://localhost:8080.
 
 - El manifiesto de `Secret` incluye un placeholder. En producción generarlo con:
   `kubectl create secret generic palma-bike-secrets --from-literal=SECRET_KEY='<valor>' -n palma-bike`.
-- La imagen referenciada es `nicolasvasq/palma-bike-microservicio:latest`. Asegurar que el pipeline la publique en un registro accesible.
+- La imagen referenciada es `ghcr.io/nicolasvasq/palma-bike-microservicio:latest`. El pipeline la publica automáticamente en GitHub Container Registry.
