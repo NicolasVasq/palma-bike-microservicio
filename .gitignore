@@ -51,5 +51,6 @@ files/imagenes/*
 ep1_detalle.txt
 ep3_detalle.txt
 *.pdf
+!docs/**/*.pdf
 .coverage
 coverage.xml
