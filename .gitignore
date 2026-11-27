@@ -50,6 +50,7 @@ files/imagenes/*
 !files/imagenes/.gitkeep
 ep1_detalle.txt
 ep3_detalle.txt
+eft_detalle.txt
 *.pdf
 !docs/**/*.pdf
 .coverage
