@@ -205,8 +205,10 @@ El pipeline completo se encuentra en `.github/workflows/ci.yml` y se ejecuta en 
 1. **Auditoría de cumplimiento**: ejecuta `scripts/compliance_audit.py` y bloquea el pipeline si detecta secretos versionados, archivos `.env` commiteados o funciones peligrosas.
 2. **Validación y pruebas**: instala dependencias, ejecuta `pytest --cov`, genera `coverage.xml`, verifica `manage.py check` y valida migraciones pendientes.
 3. **Análisis estático de seguridad**: ejecuta Bandit en el código Python. Bloquea el pipeline ante severidad MEDIA o superior.
-4. **Build, escaneo y publicación**: construye una imagen Docker, la publica en GitHub Container Registry (`ghcr.io`) y la escanea con Trivy. El reporte SARIF se almacena como artefacto.
-5. **Despliegue simulado con monitoreo**: levanta el servicio con Docker Compose, verifica salud, métricas Prometheus (`/metrics`), métricas personalizadas (`/custom-metrics/`) y la disponibilidad de Grafana.
+4. **Escaneo de secretos**: Gitleaks analiza el historial completo del repositorio en busca de credenciales filtradas y bloquea el pipeline ante cualquier detección.
+5. **Análisis de calidad**: SonarCloud ejecuta análisis estático de código sobre cada pull request. El job se habilita automáticamente al configurar el secret `SONAR_TOKEN`.
+6. **Build, escaneo y publicación**: construye una imagen Docker, la publica en GitHub Container Registry (`ghcr.io`), replica la publicación en Docker Hub (si los secrets `DOCKERHUB_USERNAME` y `DOCKERHUB_TOKEN` están configurados) y la escanea con Trivy. El reporte SARIF se almacena como artefacto.
+7. **Despliegue simulado con monitoreo**: levanta el servicio con Docker Compose, ejecuta las **pruebas de aceptación** (`scripts/acceptance_tests.py`) contra las páginas funcionales y los endpoints de métricas, verifica la disponibilidad de Grafana y ejecuta `manage.py check` dentro del contenedor.
 
 ---
 
@@ -270,12 +272,28 @@ Las pruebas actuales cubren:
 El pipeline integra múltiples capas de seguridad:
 
 - **Bandit**: análisis estático del código Python. Bloquea el pipeline si detecta problemas de severidad MEDIA o superior.
+- **Gitleaks**: escaneo de secretos sobre el historial completo de Git. Bloquea el pipeline ante cualquier credencial filtrada.
 - **Trivy**: escaneo de vulnerabilidades en la imagen Docker. Publica un reporte SARIF como artefacto para análisis y trazabilidad.
 - **Auditoría de cumplimiento**: script propio que verifica secretos hardcodeados, archivos `.env` versionados, versionado explícito de dependencias y uso de `eval/exec`.
 - **Dependabot**: revisa semanalmente las dependencias de Python y GitHub Actions, generando pull requests automáticos cuando existen actualizaciones.
-- **SonarCloud/SonarQube**: el repositorio incluye `sonar-project.properties` preparado para análisis de calidad de código. El job correspondiente se habilita automáticamente agregando el secret `SONAR_TOKEN` en el repositorio.
+- **SonarCloud/SonarQube**: análisis de calidad de código en cada pull request. El job se habilita automáticamente al agregar el secret `SONAR_TOKEN`.
 
 Si cualquier análisis crítico de seguridad o cumplimiento falla, el pipeline se bloquea y no continúa hacia el despliegue.
+
+---
+
+## Pruebas de aceptación
+
+`scripts/acceptance_tests.py` define las pruebas de aceptación que deben pasar antes de autorizar un despliegue a producción. Validan contra una instancia en ejecución (Docker Compose en el pipeline, o el clúster Kubernetes):
+
+- Páginas funcionales: `/`, `/nosotros/`, `/articulos/tienda/`, `/articulos/productos/`.
+- Endpoints de observabilidad: `/metrics` (contiene `django_http_requests_total`) y `/custom-metrics/` (contiene `palma_bike_test_coverage_percent`).
+
+```bash
+BASE_URL=http://localhost:8000 python scripts/acceptance_tests.py
+```
+
+Cualquier prueba fallida bloquea el despliegue (código de salida 1).
 
 ---
 
@@ -285,11 +303,10 @@ Como parte del pipeline, una vez aprobados tests, build y seguridad, se realiza 
 
 1. Se levanta el servicio con `docker compose up -d --build`.
 2. Se espera el inicio del contenedor.
-3. Se verifica la salud del servicio con `curl`.
-4. Se validan los endpoints `/metrics` y `/custom-metrics/`.
-5. Se verifica la salud de Grafana en el puerto `3000`.
-6. Se ejecuta `python manage.py check` dentro del contenedor.
-7. Se detienen los servicios con `docker compose down`.
+3. Se ejecutan las **pruebas de aceptación** (`scripts/acceptance_tests.py`) contra las páginas funcionales y los endpoints de métricas.
+4. Se verifica la salud de Grafana en el puerto `3000`.
+5. Se ejecuta `python manage.py check` dentro del contenedor.
+6. Se detienen los servicios con `docker compose down`.
 
 Este flujo garantiza trazabilidad y validación del artefacto generado antes de considerarlo listo para un entorno real.
 
