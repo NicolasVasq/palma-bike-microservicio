@@ -28,10 +28,10 @@ jobs:
 
     steps:
       - name: Checkout del código
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Configurar Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
         with:
           python-version: '3.13'
 
@@ -50,10 +50,10 @@ jobs:
 
     steps:
       - name: Checkout del código
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Configurar Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
         with:
           python-version: '3.13'
 
@@ -74,7 +74,7 @@ jobs:
           echo "coverage=$COVERAGE_PERCENT" >> "$GITHUB_OUTPUT"
 
       - name: Subir reporte de cobertura como artefacto
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: coverage-report
           path: coverage.xml
@@ -95,7 +95,7 @@ jobs:
 
     steps:
       - name: Checkout del código
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Instalar Bandit
         run: pip install bandit
@@ -107,7 +107,7 @@ jobs:
         run: bandit -r . -f json -o bandit-report.json -ll -x ./venv,./.git,./migrations,./articulos/tests.py || true
 
       - name: Subir reporte de Bandit como artefacto
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: bandit-report
           path: bandit-report.json
@@ -122,7 +122,7 @@ jobs:
 
     steps:
       - name: Checkout del código (historial completo)
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
 
@@ -154,7 +154,7 @@ jobs:
 
     steps:
       - name: Checkout del código
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Establecer marca de tiempo de build
         run: echo "BUILD_TIMESTAMP=$(date +%s)" >> "$GITHUB_ENV"
@@ -173,7 +173,7 @@ jobs:
         run: echo "start_time=$(date +%s)" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
 
       - name: Login a GitHub Container Registry
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
@@ -183,7 +183,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Construir y publicar imagen Docker
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
         with:
           context: .
           push: true
@@ -215,7 +215,7 @@ jobs:
         run: echo "DOCKERHUB_USERNAME/DOCKERHUB_TOKEN no configurados - publicación en Docker Hub omitida."
 
       - name: Escanear imagen con Trivy
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         with:
           image-ref: '${{ env.REGISTRY }}/${{ env.IMAGE_REPO }}:${{ env.IMAGE_TAG }}'
           format: 'sarif'
@@ -232,7 +232,7 @@ jobs:
           echo "deployment_duration=${DURATION}" >> "$GITHUB_OUTPUT"
 
       - name: Subir reporte de Trivy como artefacto
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: failure()
         with:
           name: trivy-results
@@ -248,7 +248,7 @@ jobs:
 
     steps:
       - name: Checkout del código
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Establecer variables del entorno de métricas
         run: |
