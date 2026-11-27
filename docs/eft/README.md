@@ -16,8 +16,8 @@ decisiones técnicas adoptadas para el despliegue en la nube.
 | 6 | Pruebas unitarias en el pipeline | Listo | Job `test` (pytest --cov, coverage 55%) |
 | 7 | **Publicación de la imagen en Docker Hub si las pruebas son exitosas** | Código listo | Pasos "Publicar imagen en Docker Hub" en `build-and-scan`, activados por los secrets `DOCKERHUB_USERNAME`/`DOCKERHUB_TOKEN`. Al ejecutarse tras `test`, la publicación solo ocurre si las pruebas pasaron. |
 | 8 | Pipeline disparado en push a develop y PR a main | Listo | Triggers de `ci.yml` |
-| 9 | **SonarQube en el pipeline para PRs a main** | Código listo | Job `sonarcloud` con `SonarSource/sonarcloud-github-action@v3`, activado por el secret `SONAR_TOKEN` |
-| 10 | Análisis de dependencias y escaneo de secretos (Snyk, Dependabot, SonarQube) | Listo | Dependabot (`.github/dependabot.yml`), Gitleaks (job `security-secrets`), SonarCloud (job `sonarcloud`), auditoría propia (`scripts/compliance_audit.py`) |
+| 9 | **SonarQube en el pipeline para PRs a main** | Listo | GitHub App de SonarCloud instalada en el repositorio: analiza automáticamente cada PR y su check "SonarCloud Code Analysis" falla el PR ante vulnerabilidades críticas, bloqueando el merge. Evidencia: PR #34 rechazado por 3 alertas HIGH de supply-chain hasta corregirlas (pinning de actions por SHA) |
+| 10 | Análisis de dependencias y escaneo de secretos (Snyk, Dependabot, SonarQube) | Listo | Dependabot (`.github/dependabot.yml`), Gitleaks (job `security-secrets`), SonarCloud (análisis automático en PRs), auditoría propia (`scripts/compliance_audit.py`) |
 | 11 | Pipeline interrumpido ante problemas críticos | Listo | Auditoría de cumplimiento (exit 1), Bandit (-ll), Gitleaks |
 | 12 | **Despliegue continuo en Kubernetes** | Pendiente | Manifiestos listos en `k8s/`; falta clúster EKS |
 | 13 | **Istio para redes y métricas** | Pendiente | Se instalará sobre EKS |
@@ -49,9 +49,21 @@ la consola AWS y destruir (`eksctl delete cluster`). Una tarde de trabajo cuesta
 
 ### Jobs condicionales del pipeline
 
-- La publicación en Docker Hub y el análisis de SonarCloud se activan mediante
-  secrets (`DOCKERHUB_USERNAME`, `SONAR_TOKEN`) para que el pipeline quede
+- La publicación en Docker Hub se activa mediante secrets
+  (`DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`) para que el pipeline quede
   verde sin cuentas externas y sea fácil demostrar la activación en vivo.
+- El análisis de SonarCloud **no** requiere un job de GitHub Actions: la GitHub
+  App instalada en el repositorio analiza automáticamente cada pull request y
+  su check bloquea el merge ante problemas críticos (quality gate).
+
+### Quality gate de SonarCloud en acción
+
+El PR #34 fue rechazado inicialmente por el check "SonarCloud Code Analysis"
+con 3 alertas HIGH de seguridad de la cadena de suministro: exigía fijar las
+GitHub Actions nuevas por hash SHA de commit en lugar de tags flotantes
+(`@v2`, `@v3`). Tras fijar `gitleaks-action` y `docker/login-action` por SHA,
+el check pasó. Este episodio evidencia que el pipeline interrumpe el despliegue
+ante problemas críticos de seguridad y calidad (requisitos IE9/IE13 del ET).
 
 ## Declaración de uso de inteligencia artificial
 
@@ -64,7 +76,7 @@ código generado fue revisado, probado y validado antes de versionarse.
 
 ## Trabajo pendiente
 
-1. Cuentas externas: AWS (o AWS Academy), Docker Hub, SonarCloud.
+1. Cuentas externas: AWS (o AWS Academy) y Docker Hub.
 2. Ensayo local del despliegue Kubernetes (Docker Desktop + kind) antes de usar
    el clúster real.
 3. Creación del clúster EKS, aplicación de manifiestos, Istio y CloudWatch.

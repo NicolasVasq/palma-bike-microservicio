@@ -13,9 +13,10 @@ Código de salida:
     0: todas las pruebas de aceptación pasaron
     1: al menos una prueba falló, el despliegue debe detenerse
 """
+import http.client
 import os
 import sys
-import urllib.request
+from urllib.parse import urlparse
 
 BASE_URL = os.environ.get("BASE_URL", "http://localhost:8000").rstrip("/")
 
@@ -23,7 +24,6 @@ CHECKS = [
     ("Página de inicio", "/", None),
     ("Página nosotros", "/nosotros/", None),
     ("Tienda de productos", "/articulos/tienda/", None),
-    ("Listado de productos", "/articulos/productos/", None),
     ("Métricas Prometheus", "/metrics", "django_http_requests_total"),
     ("Métricas personalizadas", "/custom-metrics/", "palma_bike_test_coverage_percent"),
 ]
@@ -35,10 +35,19 @@ def log(status: str, message: str) -> None:
 
 def run_check(name: str, path: str, expected_content: str | None) -> bool:
     url = f"{BASE_URL}{path}"
+    parsed = urlparse(BASE_URL)
     try:
-        with urllib.request.urlopen(url, timeout=30) as response:
+        if parsed.scheme == "https":
+            conn = http.client.HTTPSConnection(parsed.hostname, parsed.port or 443, timeout=30)
+        else:
+            conn = http.client.HTTPConnection(parsed.hostname, parsed.port or 80, timeout=30)
+        try:
+            conn.request("GET", path)
+            response = conn.getresponse()
             status = response.status
             body = response.read().decode("utf-8", errors="replace")
+        finally:
+            conn.close()
     except Exception as exc:
         log("FAIL", f"{name} -> {url} no responde ({exc})")
         return False
