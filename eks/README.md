@@ -58,6 +58,18 @@ Mode + 1 Gi gp3).
 | Sin perfiles de instancia para nodos propios | Auto Mode gestiona los nodos; EKS no necesita perfiles del usuario |
 | Sin IAM para CloudWatch Container Insights (requiere IRSA) | Se documenta el límite; la evidencia de métricas usa CloudWatch del NLB/EC2 y los logs del control plane |
 
+## Decisiones de seguridad documentadas
+
+- **TLS en el balanceador:** el NLB publica el servicio por HTTP (puerto 80).
+  Terminar TLS requeriría un certificado ACM con validación DNS, inviable con
+  el hostname efímero del balanceador de un clúster de vida corta. En un
+  despliegue real con dominio propio, el paso sería solicitar el ACM cert y
+  anotar el Service con `aws-load-balancer-ssl-cert` + puerto 443.
+- **Container Insights:** no se activa porque requiere IRSA (crear roles IAM
+  para el agente de CloudWatch), bloqueado por el Learner Lab. La evidencia
+  de métricas usa los namespaces NLB/EC2 de CloudWatch y los logs del
+  control plane.
+
 ## Gotchas de EKS Auto Mode descubiertos
 
 1. **El Service type LoadBalancer crea un NLB interno por defecto**: hay que

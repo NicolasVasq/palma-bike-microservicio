@@ -21,14 +21,21 @@ echo "== 2/6 Creando cluster EKS (o reutilizando el existente) =="
 if eksctl get cluster --name "$CLUSTER" --region "$REGION" >/dev/null 2>&1; then
   echo "El cluster ya existe, se reutiliza."
 else
-  eksctl create cluster -f eks/cluster.yaml --wait
+  eksctl create cluster -f eks/cluster.yaml
+  for i in $(seq 1 60); do
+    if eksctl get cluster --name "$CLUSTER" --region "$REGION" -o json 2>/dev/null | grep -q 'ACTIVE'; then
+      echo "Cluster ACTIVO (intento $i)."
+      break
+    fi
+    sleep 30
+  done
 fi
 
 echo "== 3/6 Verificando kubeconfig =="
 if ! kubectl get ns >/dev/null 2>&1; then
   eksctl utils write-kubeconfig --cluster "$CLUSTER" --region "$REGION" --set-context auto
 fi
-kubectl get ns >/dev/null 2>&1 || { echo "ERROR: kubeconfig no funcional."; exit 1; }
+kubectl get ns >/dev/null 2>&1 || { echo "ERROR: kubeconfig no funcional." >&2; exit 1; }
 
 echo "== 4/6 metrics-server (requerido por el HPA) =="
 if kubectl get deployment metrics-server -n kube-system >/dev/null 2>&1; then
@@ -58,16 +65,20 @@ echo "== 6/6 Esperando LoadBalancer y ejecutando pruebas de aceptacion =="
 LB_HOSTNAME=""
 for i in $(seq 1 30); do
   LB_HOSTNAME="$(kubectl get svc palma-bike -n "$NAMESPACE" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
-  [ -n "$LB_HOSTNAME" ] && break
+  [[ -n "$LB_HOSTNAME" ]] && break
   echo "  Esperando hostname del balanceador... ($i/30)"
   sleep 10
 done
-if [ -z "$LB_HOSTNAME" ]; then
-  echo "ERROR: el servicio no obtuvo hostname de LoadBalancer."
+if [[ -z "$LB_HOSTNAME" ]]; then
+  echo "ERROR: el servicio no obtuvo hostname de LoadBalancer." >&2
   exit 1
 fi
 
-LB_URL="http://$LB_HOSTNAME"
+# El balanceador publica el servicio por HTTP en el puerto 80. Terminar TLS
+# requeriria un certificado ACM con validacion DNS, inviable con el hostname
+# efimero del balanceador; la decision se documenta en eks/README.md.
+LB_SCHEME="http"
+LB_URL="${LB_SCHEME}://${LB_HOSTNAME}"
 echo "Servicio expuesto en: $LB_URL"
 
 PY="${PYTHON:-python3}"
@@ -84,8 +95,8 @@ for i in $(seq 1 12); do
   echo "  Aun no resuelve... ($i/12)"
   sleep 30
 done
-if [ "$DNS_OK" != "1" ]; then
-  echo "ERROR: el DNS del balanceador no resolvio a tiempo."
+if [[ "$DNS_OK" != "1" ]]; then
+  echo "ERROR: el DNS del balanceador no resolvio a tiempo." >&2
   exit 1
 fi
 
