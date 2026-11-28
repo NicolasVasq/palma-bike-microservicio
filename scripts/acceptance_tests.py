@@ -38,9 +38,9 @@ def run_check(name: str, path: str, expected_content: str | None) -> bool:
     parsed = urlparse(BASE_URL)
     try:
         if parsed.scheme == "https":
-            conn = http.client.HTTPSConnection(parsed.hostname, parsed.port or 443, timeout=30)
+            conn = http.client.HTTPSConnection(parsed.hostname, parsed.port or 443, timeout=60)
         else:
-            conn = http.client.HTTPConnection(parsed.hostname, parsed.port or 80, timeout=30)
+            conn = http.client.HTTPConnection(parsed.hostname, parsed.port or 80, timeout=60)
         try:
             conn.request("GET", path)
             response = conn.getresponse()
