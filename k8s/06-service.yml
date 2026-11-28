@@ -3,6 +3,11 @@ kind: Service
 metadata:
   name: palma-bike
   namespace: palma-bike
+  annotations:
+    # EKS Auto Mode crea un NLB interno por defecto; se exige esquema
+    # internet-facing para que el balanceador sea alcanzable desde fuera de la VPC.
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+    service.beta.kubernetes.io/aws-load-balancer-target-type: ip
 spec:
   type: LoadBalancer
   selector:
