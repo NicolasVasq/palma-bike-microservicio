@@ -373,6 +373,17 @@ ghcr.io/nicolasvasq/palma-bike-microservicio:latest
 
 > Ver `k8s/README.md` para instrucciones detalladas.
 
+### Despliegue en Amazon EKS
+
+El proyecto incluye el despliegue real en la nube con **Amazon EKS Auto Mode** (cuenta AWS Academy). La carpeta `eks/` contiene la definición del clúster, una StorageClass gp3 para EBS y los scripts de ciclo de vida:
+
+```bash
+bash eks/deploy_eks.sh     # clúster + manifiestos + pruebas de aceptación
+bash eks/destroy_eks.sh    # destruir el clúster (disciplina de costo)
+```
+
+Despliegue verificado el 2026-11-27: 2 réplicas `Running`, HPA con métricas, PVC `Bound` en gp3, NLB internet-facing y **pruebas de aceptación 5/5 PASS** contra el balanceador. Ver `eks/README.md`.
+
 ---
 
 ## Auditoría de cumplimiento

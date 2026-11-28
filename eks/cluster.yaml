@@ -1,0 +1,41 @@
+# Configuracion del cluster EKS para el microservicio Palma Bike.
+# Se crea con:  eksctl create cluster -f eks/cluster.yaml
+# Se destruye:  eksctl delete cluster --name palma-bike --region us-west-2 --wait
+#
+# Costo estimado (cuenta AWS Academy, valores de referencia):
+#   - Control plane: ~US$0.10/hora (existe mientras el cluster viva)
+#   - Nodos Auto Mode: se crean/eliminan segun carga (~US$0.05/h por nodo)
+#   Destruir el cluster al terminar cada sesion de trabajo.
+#
+# Restriccion del AWS Academy Learner Lab: el rol voclabs NO puede crear
+# roles IAM (iam:CreateRole denegado). Por eso no usamos los roles que
+# eksctl crearia por defecto, sino los pre-aprovicionados por el lab:
+#   - LabEksClusterRole: AmazonEKSClusterPolicy + las 4 politicas de
+#     EKS Auto Mode (Compute, Networking, BlockStorage, LoadBalancing)
+#   - Sin OIDC ni IRSA (denegados), pero Auto Mode gestiona EBS/ELB
+#     desde el propio servicio EKS sin roles adicionales del usuario.
+
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: palma-bike
+  region: us-west-2
+  tags:
+    proyecto: palma-bike-eft
+
+iam:
+  serviceRoleARN: "arn:aws:iam::149808177902:role/c225911a5700144l18754112t1w149808-LabEksClusterRole-nPFC7KtaX3Gb"
+
+# EKS Auto Mode: el servicio EKS gestiona los nodos (Karpenter integrado),
+# el driver EBS y los balanceadores sin requerir roles IAM del usuario.
+# Se usan los dos roles pre-aprovicionados por el lab para que eksctl
+# no intente crear roles nuevos (iam:CreateRole denegado).
+autoModeConfig:
+  enabled: true
+  nodeRoleARN: "arn:aws:iam::149808177902:role/c225911a5700144l18754112t1w149808177-LabEksNodeRole-NZ9o9cMGeMlN"
+
+# Logs del control plane hacia CloudWatch Logs (IE11: logging).
+cloudWatch:
+  clusterLogging:
+    enableTypes: ["api", "audit", "authenticator", "controllerManager", "scheduler"]

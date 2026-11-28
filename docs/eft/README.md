@@ -19,9 +19,9 @@ decisiones técnicas adoptadas para el despliegue en la nube.
 | 9 | **SonarQube en el pipeline para PRs a main** | Listo | GitHub App de SonarCloud instalada en el repositorio: analiza automáticamente cada PR y su check "SonarCloud Code Analysis" falla el PR ante vulnerabilidades críticas, bloqueando el merge. Evidencia: PR #34 rechazado por 3 alertas HIGH de supply-chain hasta corregirlas (pinning de actions por SHA) |
 | 10 | Análisis de dependencias y escaneo de secretos (Snyk, Dependabot, SonarQube) | Listo | Dependabot (`.github/dependabot.yml`), Gitleaks (job `security-secrets`), SonarCloud (análisis automático en PRs), auditoría propia (`scripts/compliance_audit.py`) |
 | 11 | Pipeline interrumpido ante problemas críticos | Listo | Auditoría de cumplimiento (exit 1), Bandit (-ll), Gitleaks |
-| 12 | **Despliegue continuo en Kubernetes** | Pendiente | Manifiestos listos en `k8s/`; falta clúster EKS |
+| 12 | **Despliegue continuo en Kubernetes** | Listo | Clúster **EKS Auto Mode** (`eks/cluster.yaml`, us-west-2): 2 réplicas `Running`, HPA con métricas reales, PVC `Bound` en gp3, pruebas de aceptación **5/5 PASS** contra el NLB internet-facing (2026-11-27) |
 | 13 | **Istio para redes y métricas** | Pendiente | Se instalará sobre EKS |
-| 14 | **AWS CloudWatch para métricas** | Pendiente | CloudWatch Container Insights sobre EKS |
+| 14 | **AWS CloudWatch para métricas** | Listo | Logs del control plane → CloudWatch Logs (`cloudWatch.clusterLogging` en `eks/cluster.yaml`); métricas del NLB/EC2 visibles en CloudWatch. Container Insights bloqueado por el lab (requiere IRSA, `iam:CreateRole` denegado) — documentado en `eks/README.md` |
 | 15 | Pruebas de aceptación antes de producción | Listo | `scripts/acceptance_tests.py`, ejecutado en el job `deploy-simulated`; reutilizable contra el clúster EKS |
 | 16 | Políticas de GitHub con revisiones/aprobaciones para desplegar | Listo | Branch protection en `main` y `develop` (PR obligatorio) |
 
@@ -76,8 +76,6 @@ código generado fue revisado, probado y validado antes de versionarse.
 
 ## Trabajo pendiente
 
-1. Cuentas externas: AWS (o AWS Academy) y Docker Hub.
-2. Ensayo local del despliegue Kubernetes (Docker Desktop + kind) antes de usar
-   el clúster real.
-3. Creación del clúster EKS, aplicación de manifiestos, Istio y CloudWatch.
-4. Captura de evidencias de la consola AWS y destrucción del clúster.
+1. Docker Hub (cuenta + secrets) para activar la publicación.
+2. Istio sobre EKS (IE12) en la siguiente sesión de lab.
+3. Capturas de consola de la sesión del 2026-11-27: guardarlas para la presentación.
